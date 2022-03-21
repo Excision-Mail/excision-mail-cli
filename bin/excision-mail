@@ -186,8 +186,9 @@ if __name__ == '__main__':
     if args.prompt_passwd or 'ldap_passwd' not in config.keys():
         config['ldap_passwd'] = getpass('LDAP Password:')
 
+    config.update(vars(args))
     try:
-        commands[args.command](config=config, **vars(args))
+        commands[args.command](**config)
     except RedundantOperation:
         logging.warning('Redundant command')
     except Exception as expt:
