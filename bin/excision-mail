@@ -47,8 +47,7 @@ check_conf_p = subparsers.add_parser(
 add_user_p = subparsers.add_parser('add-user', help='add a new user')
 add_user_p.add_argument('user', type=str, help='user to add')
 
-add_alias_p = subparsers.add_parser('add-alias',
-                                    help='add a new alias')
+add_alias_p = subparsers.add_parser('add-alias', help='add a new alias')
 add_alias_p.add_argument('alias', type=str, help='alias email address')
 
 allow_alias_p = subparsers.add_parser('allow-alias',
@@ -68,7 +67,8 @@ delete_user_p.add_argument('user', type=str, help='user to delete')
 delete_alias_p = subparsers.add_parser('delete-alias', help='delete an alias')
 delete_alias_p.add_argument('alias', type=str, help='alias to delete')
 
-remove_alias_p = subparsers.add_parser('remove-alias', help='remove an alias from a user')
+remove_alias_p = subparsers.add_parser('remove-alias',
+                                       help='remove an alias from a user')
 remove_alias_p.add_argument('user', type=str, help='user email address')
 remove_alias_p.add_argument('alias', type=str, help='alias email address')
 

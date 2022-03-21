@@ -196,7 +196,9 @@ class UserManager:
             '(&(aliasAddress={0})(objectClass=mailUser))'.format(alias))
         logging.debug('Found %d users', len(entries))
         for ent in entries:
-            self.ldap_conn.modify_s(ent[0], [(ldap.MOD_DELETE, 'aliasAddress', alias.encode('UTF-8'))])
+            self.ldap_conn.modify_s(
+                ent[0],
+                [(ldap.MOD_DELETE, 'aliasAddress', alias.encode('UTF-8'))])
         logging.debug('Removed alias from all users')
         logging.debug('Constructing alias DN')
         alias_dn = self.alias_dn_pattern.format(*alias_data)
