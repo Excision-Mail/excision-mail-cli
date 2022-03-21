@@ -1,6 +1,6 @@
-def check_zone(*_, **__):
+def zone_check(*_, **__):
     return
 
 
-def ensure_zone(*_, **__):
+def zone_setup(*_, **__):
     return

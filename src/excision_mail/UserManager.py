@@ -4,7 +4,8 @@ from enum import Enum
 import ldap
 from obsd_crypt import crypt_newhash
 
-from .config import needed_keys
+from .config import needed_keys, optional_keys
+from .errors import RedundantOperation
 from .utils import parse_email
 
 
@@ -22,6 +23,9 @@ class UserManager:
     def __init__(self, *args, **kwargs):
         for kkey in needed_keys:
             setattr(self, kkey, kwargs[kkey])
+        for kkey in optional_keys:
+            if kkey in kwargs.keys():
+                setattr(self, kkey, kwargs[kkey])
         logging.debug('Initializing LDAP connection to server at %s',
                       self.ldap_uri)
         self.ldap_conn = ldap.initialize(self.ldap_uri)
@@ -33,7 +37,7 @@ class UserManager:
     def __del__(self):
         self.ldap_conn.unbind_s()
 
-    def check_status(self, mail: str = '') -> UStat:
+    def check_status(self, mail: str) -> UStat:
         logging.debug('Checking status for "%s"', mail)
         mail_data = parse_email(mail)
 
@@ -65,13 +69,16 @@ class UserManager:
             return UStat.EXTERNAL
         return UStat.UNKNOWN
 
-    def add_user(self, user: str, passwd: str):
+    def user_add(self, user: str, passwd: str):
         logging.debug('Adding user "%s"', user)
         logging.debug('Validating username')
         user_data = parse_email(user)
         logging.debug('Getting user status in system')
         ustatus = self.check_status(user)
 
+        if ustatus == UStat.USER:
+            logging.warning('"%s" is already a user', user)
+            raise RedundantOperation
         if ustatus != UStat.ABSENT:
             raise ValueError(f'"{user}" already present in the system')
 
@@ -91,6 +98,72 @@ class UserManager:
         logging.debug('Inserting with DN "%s"', user_dn)
         self.ldap_conn.add_s(user_dn, user_info)
         logging.debug('Successfully added user "%s"', user)
+
+    def user_delete(self, user: str):
+        logging.debug('Validating username')
+        user_data = parse_email(user)
+        logging.debug('Getting user status in system')
+        ustatus = self.check_status(user)
+
+        if ustatus == UStat.ABSENT:
+            logging.warning('"%s" is not in the system', user)
+            raise RedundantOperation
+        if ustatus != UStat.USER:
+            raise ValueError(f'"{user}" it not a user')
+
+        logging.debug('Constructing user DN')
+        user_dn = self.user_dn_pattern.format(*user_data)
+        logging.debug('Deleting with DN "%s"', user_dn)
+        self.ldap_conn.delete_s(user_dn)
+        logging.debug('Successfully deleted user "%s"', user)
+
+    def user_disable(self, user: str):
+        logging.debug('Validating username')
+        user_data = parse_email(user)
+        logging.debug('Getting user status in system')
+        ustatus = self.check_status(user)
+
+        if ustatus != UStat.USER:
+            raise ValueError(f'"{user}" it not a user')
+
+        user_attrs = self.ldap_cache[user][1]
+        ldap_op = ldap.MOD_ADD
+        if 'accountStatus' in user_attrs.keys():
+            ldap_op = ldap.MOD_REPLACE
+            if user_attrs['accountStatus'] == [b'FALSE']:
+                logging.warning('"%s" is already disabled', user)
+                raise RedundantOperation
+
+        user_info = [(ldap_op, 'accountStatus', b'FALSE')]
+        logging.debug('Constructing user DN')
+        user_dn = self.user_dn_pattern.format(*user_data)
+        logging.debug('Disabling with DN "%s"', user_dn)
+        self.ldap_conn.modify_s(user_dn, user_info)
+        logging.debug('Successfully disabled user "%s"', user)
+
+    def user_enable(self, user: str):
+        logging.debug('Validating username')
+        user_data = parse_email(user)
+        logging.debug('Getting user status in system')
+        ustatus = self.check_status(user)
+
+        if ustatus != UStat.USER:
+            raise ValueError(f'"{user}" it not a user')
+
+        user_attrs = self.ldap_cache[user][1]
+        ldap_op = ldap.MOD_ADD
+        if 'accountStatus' in user_attrs.keys():
+            ldap_op = ldap.MOD_REPLACE
+            if user_attrs['accountStatus'] == [b'TRUE']:
+                logging.warning('"%s" is already enabled', user)
+                raise RedundantOperation
+
+        user_info = [(ldap_op, 'accountStatus', b'TRUE')]
+        logging.debug('Constructing user DN')
+        user_dn = self.user_dn_pattern.format(*user_data)
+        logging.debug('Disabling with DN "%s"', user_dn)
+        self.ldap_conn.modify_s(user_dn, user_info)
+        logging.debug('Successfully enabled user "%s"', user)
 
     def change_passwd(self, user: str, passwd: str):
         logging.debug('Changing password for "%s"', user)
@@ -114,11 +187,14 @@ class UserManager:
         self.ldap_conn.modify_s(user_dn, user_info)
         logging.debug('Successfully changed password for "%s"', user)
 
-    def add_alias(self, alias: str):
+    def alias_add(self, alias: str):
         logging.debug('Validating alias')
         alias_data = parse_email(alias)
         logging.debug('Checking alias status in system')
         astatus = self.check_status(alias)
+        if astatus == UStat.ALIAS:
+            logging.warning('"%s" is already an alias', alias)
+            raise RedundantOperation
         if astatus != UStat.ABSENT:
             raise ValueError(f'"{alias}" is already present in the system')
 
@@ -134,7 +210,7 @@ class UserManager:
         self.ldap_conn.add_s(alias_dn, alias_info)
         logging.debug('Successfully added alias entry')
 
-    def allow_alias(self, user: str, alias: str):
+    def alias_allow(self, user: str, alias: str):
         logging.debug('Validating user')
         user_data = parse_email(user)
         logging.debug('Checking user status in system')
@@ -149,13 +225,20 @@ class UserManager:
         if astatus != UStat.ALIAS:
             raise ValueError(f'"{alias}" is not an alias')
 
+        user_attrs = self.ldap_cache[user][1]
+        if 'aliasAddress' in user_attrs.keys(
+        ) and alias.encode('UTF-8') in user_attrs['aliasAddress']:
+            logging.warning('"%s" is already used as an alias by "%s"', alias,
+                          user)
+            raise RedundantOperation
+
         user_info = [(ldap.MOD_ADD, 'aliasAddress', alias.encode('UTF-8'))]
         logging.debug('Constructing user DN')
         user_dn = self.user_dn_pattern.format(*user_data)
         self.ldap_conn.modify_s(user_dn, user_info)
         logging.debug('Successfully added alias "%s" for "%s"', alias, user)
 
-    def remove_alias(self, user: str, alias: str):
+    def alias_deny(self, user: str, alias: str):
         logging.debug('Validating user')
         user_data = parse_email(user)
         logging.debug('Checking user status in system')
@@ -172,9 +255,9 @@ class UserManager:
 
         user_attrs = self.ldap_cache[user][1]
         if 'aliasAddress' not in user_attrs.keys(
-        ) or alias not in user_attrs['aliasAddress']:
-            logging.debug('"%s" is not used as an alias by "%s"', alias, user)
-            return
+        ) or alias.encode('UTF-8') not in user_attrs['aliasAddress']:
+            logging.warning('"%s" is not used by "%s"', alias, user)
+            raise RedundantOperation
 
         user_info = [(ldap.MOD_DELETE, 'aliasAddress', alias.encode('UTF-8'))]
         logging.debug('Constructing user DN')
@@ -182,11 +265,14 @@ class UserManager:
         self.ldap_conn.modify_s(user_dn, user_info)
         logging.debug('Successfully removed alias "%s" for "%s"', alias, user)
 
-    def delete_alias(self, alias: str):
+    def alias_delete(self, alias: str):
         logging.debug('Validating alias')
         alias_data = parse_email(alias)
         logging.debug('Checking alias status in system')
         astatus = self.check_status(alias)
+        if astatus == UStat.ABSENT:
+            logging.warning('"%s" not present in the system', alias)
+            raise RedundantOperation
         if astatus != UStat.ALIAS:
             raise ValueError(f'"{alias}" is not an alias')
 

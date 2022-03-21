@@ -10,18 +10,20 @@ from os.path import exists
 from pathlib import Path
 
 from excision_mail.config import check_conf
-from excision_mail.gpg import ensure_gpg
-from excision_mail.user import (account_info, add_alias, add_user, allow_alias,
-                                change_passwd, delete_alias, delete_user,
-                                remove_alias)
-from excision_mail.zone import check_zone, ensure_zone
+from excision_mail.errors import RedundantOperation
+from excision_mail.gpg import gpg_setup
+from excision_mail.user import (account_info, alias_add, alias_allow,
+                                alias_delete, alias_deny, alias_disable,
+                                alias_enable, change_passwd, user_add,
+                                user_delete, user_disable, user_enable)
+from excision_mail.zone import zone_check, zone_setup
 
 parser = argparse.ArgumentParser(
     description='Tools to manage the Excision Mail system.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-c',
                     type=str,
-                    default='/etc/excision-mail.conf',
+                    default='/etc/excision-mail/excision-mail.ini',
                     dest='config_file',
                     help='alternative configuration file')
 parser.add_argument('-d',
@@ -41,37 +43,6 @@ parser.add_argument('-u',
 
 subparsers = parser.add_subparsers(dest='command')
 
-check_conf_p = subparsers.add_parser(
-    'check-conf', help='check and validate the configuration file')
-
-add_user_p = subparsers.add_parser('add-user', help='add a new user')
-add_user_p.add_argument('user', type=str, help='user to add')
-
-add_alias_p = subparsers.add_parser('add-alias', help='add a new alias')
-add_alias_p.add_argument('alias', type=str, help='alias email address')
-
-allow_alias_p = subparsers.add_parser('allow-alias',
-                                      help='allow user to use an alias')
-allow_alias_p.add_argument('user', type=str, help='user email address')
-allow_alias_p.add_argument('alias', type=str, help='alias email address')
-
-change_passwd_p = subparsers.add_parser('change-passwd',
-                                        help='change password for a user')
-change_passwd_p.add_argument('user',
-                             type=str,
-                             help='user whose password to change')
-
-delete_user_p = subparsers.add_parser('delete-user', help='delete a user')
-delete_user_p.add_argument('user', type=str, help='user to delete')
-
-delete_alias_p = subparsers.add_parser('delete-alias', help='delete an alias')
-delete_alias_p.add_argument('alias', type=str, help='alias to delete')
-
-remove_alias_p = subparsers.add_parser('remove-alias',
-                                       help='remove an alias from a user')
-remove_alias_p.add_argument('user', type=str, help='user email address')
-remove_alias_p.add_argument('alias', type=str, help='alias email address')
-
 account_info_p = subparsers.add_parser(
     'account-info', help='get information about a user/alias')
 account_info_p.add_argument('-v',
@@ -82,36 +53,88 @@ account_info_p.add_argument('account',
                             type=str,
                             help='user/alias whose information to query')
 
-check_zone_p = subparsers.add_parser('check-zone',
+alias_add_p = subparsers.add_parser('alias-add', help='add a new alias')
+alias_add_p.add_argument('alias', type=str, help='alias email address')
+
+alias_allow_p = subparsers.add_parser('alias-allow',
+                                      help='allow user to use an alias')
+alias_allow_p.add_argument('user', type=str, help='user email address')
+alias_allow_p.add_argument('alias', type=str, help='alias email address')
+
+alias_delete_p = subparsers.add_parser('alias-delete', help='delete an alias')
+alias_delete_p.add_argument('alias', type=str, help='alias to delete')
+
+alias_deny_p = subparsers.add_parser('alias-deny',
+                                     help='remove an alias from a user')
+alias_deny_p.add_argument('user', type=str, help='user email address')
+alias_deny_p.add_argument('alias', type=str, help='alias email address')
+
+alias_disable_p = subparsers.add_parser('alias-disable',
+                                        help='disable an alias')
+alias_disable_p.add_argument('alias', type=str, help='alias to disable')
+
+alias_enable_p = subparsers.add_parser('alias-enable',
+                                        help='enable an alias')
+alias_enable_p.add_argument('alias', type=str, help='alias to enable')
+
+change_passwd_p = subparsers.add_parser('change-passwd',
+                                        help='change password for a user')
+change_passwd_p.add_argument('user',
+                             type=str,
+                             help='user whose password to change')
+
+check_conf_p = subparsers.add_parser(
+    'check-conf', help='check and validate the configuration file')
+
+gpg_setup_p = subparsers.add_parser('gpg-setup',
+                                    help='setup GPG WKD and WKS folders')
+
+user_add_p = subparsers.add_parser('user-add', help='add a new user')
+user_add_p.add_argument('user', type=str, help='user to add')
+
+user_delete_p = subparsers.add_parser('user-delete', help='delete a user')
+user_delete_p.add_argument('user', type=str, help='user to delete')
+
+user_disable_p = subparsers.add_parser('user-disable', help='disable a user')
+user_disable_p.add_argument('user', type=str, help='user to disable')
+
+user_enable_p = subparsers.add_parser('user-enable', help='enable a user')
+user_enable_p.add_argument('user', type=str, help='user to enable')
+
+zone_check_p = subparsers.add_parser('zone-check',
                                      help='check for DNS records in knot-dns')
-check_zone_p.add_argument('domain',
+zone_check_p.add_argument('domain',
                           type=str,
                           help='domain to check records of')
 
-ensure_zone_p = subparsers.add_parser(
-    'ensure-zone', help='add needed DNS records for a zone in knot-dns')
-ensure_zone_p.add_argument('domain',
-                           type=str,
-                           help='domain for which to add records')
-
-ensure_gpg_p = subparsers.add_parser('ensure-gpg',
-                                     help='setup GPG WKD and WKS folders')
+zone_setup_p = subparsers.add_parser(
+    'zone-setup', help='add needed DNS records for a zone in knot-dns')
+zone_setup_p.add_argument('domain',
+                          type=str,
+                          help='domain for which to add records')
 
 commands: typing.Dict[str, typing.Callable] = {}
 
-commands['add-user'] = add_user
-commands['add-alias'] = add_alias
-commands['allow-alias'] = allow_alias
-commands['remove-alias'] = remove_alias
-commands['change-passwd'] = change_passwd
-commands['delete-user'] = delete_user
-commands['delete-alias'] = delete_alias
 commands['account-info'] = account_info
 
-commands['check-zone'] = check_zone
-commands['ensure-zone'] = ensure_zone
+commands['alias-add'] = alias_add
+commands['alias-allow'] = alias_allow
+commands['alias-delete'] = alias_delete
+commands['alias-deny'] = alias_deny
+commands['alias-disable'] = alias_disable
+commands['alias-enable'] = alias_enable
 
-commands['ensure-gpg'] = ensure_gpg
+commands['change-passwd'] = change_passwd
+
+commands['gpg-setup'] = gpg_setup
+
+commands['user-add'] = user_add
+commands['user-delete'] = user_delete
+commands['user-disable'] = user_disable
+commands['user-enable'] = user_enable
+
+commands['zone-check'] = zone_check
+commands['zone-setup'] = zone_setup
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -147,12 +170,6 @@ if __name__ == '__main__':
 
     config = dict(config.items('excision-mail'))
 
-    if args.prompt_user or 'ldap_user' not in config.keys():
-        config['ldap_user'] = input('LDAP Username:')
-
-    if args.prompt_passwd or 'ldap_passwd' not in config.keys():
-        config['ldap_passwd'] = getpass('LDAP Password:')
-
     try:
         check_conf(config)
     except Exception as expt:
@@ -160,11 +177,19 @@ if __name__ == '__main__':
                          args.config_file, str(expt))
         sys.exit(1)
 
-    if args.command == 'check-conf':
+    if args.command == 'check-conf' or args.command == None:
         sys.exit(0)
+
+    if args.prompt_user or 'ldap_user' not in config.keys():
+        config['ldap_user'] = input('LDAP Username:')
+
+    if args.prompt_passwd or 'ldap_passwd' not in config.keys():
+        config['ldap_passwd'] = getpass('LDAP Password:')
 
     try:
         commands[args.command](config=config, **vars(args))
+    except RedundantOperation:
+        logging.warning('Redundant command')
     except Exception as expt:
         logging.critical('Could not run the command "%s": %s', args.command,
                          str(expt))

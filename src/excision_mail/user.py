@@ -4,47 +4,56 @@ from .UserManager import UserManager, UStat
 from .utils import get_newpass
 
 
-def add_user(user: str, config: typing.Dict[str, str], *_, **__):
+def user_add(user: str, config: typing.Dict[str, str], *_, **__):
     um = UserManager(**config)
     newpass = get_newpass()
-    um.add_user(user, newpass)
+    um.user_add(user, newpass)
 
 
-def disable_user(user: str, config: typing.Dict[str, str], *args, **kwargs):
+def user_delete(user: str, config: typing.Dict[str, str], *_, **__):
     um = UserManager(**config)
-    um.disable_user(user)
+    um.user_delete(user)
 
 
-def delete_user(user: str = '', *_, **__):
+def user_disable(user: str, config: typing.Dict[str, str], *args, **kwargs):
     um = UserManager(**config)
-    um.delete_user(user)
+    um.user_disable(user)
 
 
-def add_alias(alias: str, config: typing.Dict[str, str], *_, **__):
+def user_enable(user: str, config: typing.Dict[str, str], *args, **kwargs):
     um = UserManager(**config)
-    um.add_alias(alias)
+    um.user_enable(user)
 
 
-def allow_alias(user: str, alias: str, config: typing.Dict[str, str], *_,
+def alias_add(alias: str, config: typing.Dict[str, str], *_, **__):
+    um = UserManager(**config)
+    um.alias_add(alias)
+
+
+def alias_allow(user: str, alias: str, config: typing.Dict[str, str], *_,
                 **__):
     um = UserManager(**config)
-    um.allow_alias(user, alias)
+    um.alias_allow(user, alias)
 
 
-def disable_alias(alias: str, config: typing.Dict[str, str], *_, **__):
+def alias_delete(alias: str, config: typing.Dict[str, str], *_, **__):
     um = UserManager(**config)
-    um.disable_alias(alias)
+    um.alias_delete(alias)
 
 
-def delete_alias(alias: str, config: typing.Dict[str, str], *_, **__):
+def alias_deny(user: str, alias: str, config: typing.Dict[str, str], *_, **__):
     um = UserManager(**config)
-    um.delete_alias(alias)
+    um.alias_deny(user, alias)
 
 
-def remove_alias(user: str, alias: str, config: typing.Dict[str, str], *_,
-                 **__):
+def alias_disable(alias: str, config: typing.Dict[str, str], *_, **__):
     um = UserManager(**config)
-    um.remove_alias(user, alias)
+    um.alias_disable(alias)
+
+
+def alias_enable(alias: str, config: typing.Dict[str, str], *_, **__):
+    um = UserManager(**config)
+    um.alias_enable(alias)
 
 
 def change_passwd(user: str, config: typing.Dict[str, str], *_, **__):

@@ -1,2 +1,2 @@
-def ensure_gpg(*_, **__):
+def gpg_setup(*_, **__):
     return
