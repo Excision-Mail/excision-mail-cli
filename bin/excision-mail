@@ -11,7 +11,7 @@ from pathlib import Path
 
 from excision_mail.config import check_conf
 from excision_mail.errors import RedundantOperation
-from excision_mail.gpg import gpg_setup
+from excision_mail.pgp import pgp_setup
 from excision_mail.user import (account_info, alias_add, alias_allow,
                                 alias_delete, alias_deny, alias_disable,
                                 alias_enable, change_passwd, user_add,
@@ -19,7 +19,7 @@ from excision_mail.user import (account_info, alias_add, alias_allow,
 from excision_mail.zone import zone_check, zone_setup
 
 parser = argparse.ArgumentParser(
-    description='Tools to manage the Excision Mail system.',
+    description='Excision Mail admin interface',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-c',
                     type=str,
@@ -45,10 +45,6 @@ subparsers = parser.add_subparsers(dest='command')
 
 account_info_p = subparsers.add_parser(
     'account-info', help='get information about a user/alias')
-account_info_p.add_argument('-v',
-                            dest='verbose',
-                            action='store_true',
-                            help='print all information for the account')
 account_info_p.add_argument('account',
                             type=str,
                             help='user/alias whose information to query')
@@ -86,8 +82,8 @@ change_passwd_p.add_argument('user',
 check_conf_p = subparsers.add_parser(
     'check-conf', help='check and validate the configuration file')
 
-gpg_setup_p = subparsers.add_parser('gpg-setup',
-                                    help='setup GPG WKD and WKS folders')
+pgp_setup_p = subparsers.add_parser('pgp-setup',
+                                    help='setup PGP WKD and WKS folders')
 
 user_add_p = subparsers.add_parser('user-add', help='add a new user')
 user_add_p.add_argument('user', type=str, help='user to add')
@@ -126,7 +122,7 @@ commands['alias-enable'] = alias_enable
 
 commands['change-passwd'] = change_passwd
 
-commands['gpg-setup'] = gpg_setup
+commands['pgp-setup'] = pgp_setup
 
 commands['user-add'] = user_add
 commands['user-delete'] = user_delete

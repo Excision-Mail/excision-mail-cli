@@ -1,3 +1,31 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "excision-mail-cli"
+version = "0.0.1"
+description = "Excision Mail admin interface"
+license = "ISC"
+authors = [
+    "Aisha Tammy <aisha@bsd.ac>",
+]
+homepage = "https://excision.bsd.ac"
+repository = "https://github.com/Excision-Mail/excision-mail-cli"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: ISC License",
+    "Operating System :: OpenBSD",
+]
+packages = [
+    "excision-mail",
+]
+
+[tools.poetry.scripts]
+excision-mail = "bin/excision-mail"
+
+[tool.poetry.requirements]
+coloredlogs = "^15.0.0"
+cryptography = "^38.0.0"
+libknot = "^3.2.0"
+python-ldap = "^3.4.0"
